@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"net"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
+	"google.golang.org/grpc"
+
 	"github.com/tkaixinn/trade-settlement-engine/internal/ledger"
+	pb "github.com/tkaixinn/trade-settlement-engine/proto"
 )
 
 func main() {
@@ -21,24 +22,16 @@ func main() {
 	}
 	defer pool.Close()
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-	defer rdb.Close()
-
-	traderA := uuid.MustParse("ebedb0d4-8b95-4f66-b047-77d308dea1c3")
-	clearing := uuid.MustParse("05aeff6e-4cdc-4119-b127-7312bf5ae9a6")
-	eventID := uuid.New()
-
-	entries := []ledger.Entry{
-		{AccountID: traderA, Amount: 100},
-		{AccountID: clearing, Amount: -100},
-	}
-
-	err = ledger.RecordEvent(ctx, pool, rdb, eventID, entries)
+	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
-		log.Fatalf("failed to record event: %v", err)
+		log.Fatalf("failed to listen: %v", err)
 	}
 
-	fmt.Println("event recorded successfully:", eventID)
+	grpcServer := grpc.NewServer()
+	pb.RegisterLedgerServiceServer(grpcServer, &ledger.Server{Pool: pool})
+
+	log.Println("ledger gRPC server listening on :50051")
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
+	}
 }
