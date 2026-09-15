@@ -3,8 +3,10 @@ package ledger
 import (
 	"context"
 	"errors"
+	"time"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type Entry struct {
@@ -12,13 +14,22 @@ type Entry struct {
 	Amount    float64
 }
 
-func RecordEvent(ctx context.Context, pool *pgxpool.Pool, eventID uuid.UUID, entries []Entry) error {
+func RecordEvent(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, eventID uuid.UUID, entries []Entry) error {
 	var total float64
 	for _, e := range entries {
 		total += e.Amount
 	}
 	if total != 0 {
 		return errors.New("ledger entries do not balance to zero")
+	}
+
+	redisKey := "processed_event:" + eventID.String()
+	seenInRedis, err := rdb.Exists(ctx, redisKey).Result()
+	if err != nil {
+		return err
+	}
+	if seenInRedis > 0 {
+		return nil
 	}
 
 	tx, err := pool.Begin(ctx)
@@ -33,6 +44,7 @@ func RecordEvent(ctx context.Context, pool *pgxpool.Pool, eventID uuid.UUID, ent
 		return err
 	}
 	if exists {
+		rdb.Set(ctx, redisKey, "1", 24*time.Hour)
 		return nil
 	}
 
@@ -50,5 +62,10 @@ func RecordEvent(ctx context.Context, pool *pgxpool.Pool, eventID uuid.UUID, ent
 		return err
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	rdb.Set(ctx, redisKey, "1", 24*time.Hour)
+	return nil
 }
