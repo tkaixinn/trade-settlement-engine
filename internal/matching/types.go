@@ -15,16 +15,19 @@ const (
 )
 
 type Order struct {
-	ID       string
-	Side     Side
-	Type     OrderType
-	Price    float64
-	Quantity int
+	ID        string
+	AccountID string
+	Side      Side
+	Type      OrderType
+	Price     float64
+	Quantity  int
 }
 
 type Fill struct {
-	BuyOrderID  string
-	SellOrderID string
-	Price       float64
-	Quantity    int
+	BuyOrderID    string
+	SellOrderID   string
+	BuyAccountID  string
+	SellAccountID string
+	Price         float64
+	Quantity      int
 }

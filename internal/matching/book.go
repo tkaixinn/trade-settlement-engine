@@ -86,10 +86,12 @@ func (b *Book) matchBuy(incoming *Order) []Fill {
 
 		qty := min(incoming.Quantity, resting.Quantity)
 		fills = append(fills, Fill{
-			BuyOrderID:  incoming.ID,
-			SellOrderID: resting.ID,
-			Price:       sellPrice,
-			Quantity:    qty,
+			BuyOrderID:    incoming.ID,
+			SellOrderID:   resting.ID,
+			BuyAccountID:  incoming.AccountID,
+			SellAccountID: resting.AccountID,
+			Price:         sellPrice,
+			Quantity:      qty,
 		})
 
 		incoming.Quantity -= qty
@@ -132,10 +134,12 @@ func (b *Book) matchSell(incoming *Order) []Fill {
 
 		qty := min(incoming.Quantity, resting.Quantity)
 		fills = append(fills, Fill{
-			BuyOrderID:  resting.ID,
-			SellOrderID: incoming.ID,
-			Price:       buyPrice,
-			Quantity:    qty,
+			BuyOrderID:    resting.ID,
+			SellOrderID:   incoming.ID,
+			BuyAccountID:  resting.AccountID,
+			SellAccountID: incoming.AccountID,
+			Price:         buyPrice,
+			Quantity:      qty,
 		})
 
 		incoming.Quantity -= qty

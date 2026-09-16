@@ -16,11 +16,12 @@ func TestEngine_ConcurrentSubmission(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			order := &Order{
-				ID:       "sell-order",
-				Side:     Sell,
-				Type:     Limit,
-				Price:    100,
-				Quantity: 1,
+				ID:        "sell-order",
+				AccountID: "seller-account",
+				Side:      Sell,
+				Type:      Limit,
+				Price:     100,
+				Quantity:  1,
 			}
 			engine.Submit(order)
 		}(i)
@@ -29,10 +30,11 @@ func TestEngine_ConcurrentSubmission(t *testing.T) {
 	wg.Wait()
 
 	buyOrder := &Order{
-		ID:       "buy-check",
-		Side:     Buy,
-		Type:     Market,
-		Quantity: numOrders,
+		ID:        "buy-check",
+		AccountID: "buyer-account",
+		Side:      Buy,
+		Type:      Market,
+		Quantity:  numOrders,
 	}
 	fills := engine.Submit(buyOrder)
 
