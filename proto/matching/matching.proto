@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package matching;
+
+option go_package = "github.com/tkaixinn/trade-settlement-engine/proto/matching";
+
+service MatchingService {
+  rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse);
+}
+
+message SubmitOrderRequest {
+  string account_id = 1;
+  string side = 2;
+  string order_type = 3;
+  double price = 4;
+  int32 quantity = 5;
+}
+
+message Fill {
+  string buy_account_id = 1;
+  string sell_account_id = 2;
+  double price = 3;
+  int32 quantity = 4;
+}
+
+message SubmitOrderResponse {
+  repeated Fill fills = 1;
+}

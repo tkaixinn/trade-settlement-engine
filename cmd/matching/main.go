@@ -1,44 +1,32 @@
 package main
 
 import (
-	"context"
 	"log"
+	"net"
 
-	"github.com/google/uuid"
+	"google.golang.org/grpc"
 
 	"github.com/tkaixinn/trade-settlement-engine/internal/matching"
+	pb "github.com/tkaixinn/trade-settlement-engine/proto/matching"
 )
 
 func main() {
-	ctx := context.Background()
-
 	engine := matching.NewEngine()
 	publisher := matching.NewPublisher()
 
-	sellOrder := &matching.Order{
-		ID:        uuid.New().String(),
-		AccountID: "05aeff6e-4cdc-4119-b127-7312bf5ae9a6",
-		Side:      matching.Sell,
-		Type:      matching.Limit,
-		Price:     100,
-		Quantity:  10,
+	lis, err := net.Listen("tcp", ":50052")
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
 	}
-	engine.Submit(sellOrder)
-	log.Println("resting sell order placed")
 
-	buyOrder := &matching.Order{
-		ID:        uuid.New().String(),
-		AccountID: "ebedb0d4-8b95-4f66-b047-77d308dea1c3",
-		Side:      matching.Buy,
-		Type:      matching.Market,
-		Quantity:  10,
-	}
-	fills := engine.Submit(buyOrder)
-	log.Printf("buy order matched, %d fills", len(fills))
+	grpcServer := grpc.NewServer()
+	pb.RegisterMatchingServiceServer(grpcServer, &matching.Server{
+		Engine:    engine,
+		Publisher: publisher,
+	})
 
-	for _, f := range fills {
-		if err := publisher.PublishFill(ctx, f); err != nil {
-			log.Printf("failed to publish fill: %v", err)
-		}
+	log.Println("matching gRPC server listening on :50052")
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve: %v", err)
 	}
 }
