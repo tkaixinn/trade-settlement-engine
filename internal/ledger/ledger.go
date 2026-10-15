@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"time"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -15,6 +17,9 @@ type Entry struct {
 }
 
 func RecordEvent(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, eventID uuid.UUID, entries []Entry) error {
+	timer := prometheus.NewTimer(RecordEventDuration)
+	defer timer.ObserveDuration()
+
 	var total float64
 	for _, e := range entries {
 		total += e.Amount
@@ -29,6 +34,7 @@ func RecordEvent(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, eve
 		return err
 	}
 	if seenInRedis > 0 {
+		EventsDuplicate.Inc()
 		return nil
 	}
 
@@ -45,6 +51,7 @@ func RecordEvent(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, eve
 	}
 	if exists {
 		rdb.Set(ctx, redisKey, "1", 24*time.Hour)
+		EventsDuplicate.Inc()
 		return nil
 	}
 
@@ -67,5 +74,6 @@ func RecordEvent(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, eve
 	}
 
 	rdb.Set(ctx, redisKey, "1", 24*time.Hour)
+	EventsProcessed.Inc()
 	return nil
 }

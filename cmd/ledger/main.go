@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"log"
 	"net"
+	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
@@ -32,6 +34,7 @@ func main() {
 	defer rdb.Close()
 
 	go startGRPCServer(pool)
+	go startMetricsServer()
 
 	consumeKafka(ctx, pool, rdb)
 }
@@ -48,6 +51,14 @@ func startGRPCServer(pool *pgxpool.Pool) {
 	log.Println("ledger gRPC server listening on :50051")
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve grpc: %v", err)
+	}
+}
+
+func startMetricsServer() {
+	http.Handle("/metrics", promhttp.Handler())
+	log.Println("metrics server listening on :9101")
+	if err := http.ListenAndServe(":9101", nil); err != nil {
+		log.Fatalf("failed to serve metrics: %v", err)
 	}
 }
 
