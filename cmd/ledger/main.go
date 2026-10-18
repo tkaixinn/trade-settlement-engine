@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -14,6 +15,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"google.golang.org/grpc"
 
+	"github.com/tkaixinn/trade-settlement-engine/internal/analytics"
 	"github.com/tkaixinn/trade-settlement-engine/internal/ledger"
 	pb "github.com/tkaixinn/trade-settlement-engine/proto"
 )
@@ -33,10 +35,16 @@ func main() {
 	})
 	defer rdb.Close()
 
+	chConn, err := analytics.NewClickHouseConn(ctx)
+	if err != nil {
+		log.Fatalf("unable to connect to clickhouse: %v", err)
+	}
+	defer chConn.Close()
+
 	go startGRPCServer(pool)
 	go startMetricsServer()
 
-	consumeKafka(ctx, pool, rdb)
+	consumeKafka(ctx, pool, rdb, chConn)
 }
 
 func startGRPCServer(pool *pgxpool.Pool) {
@@ -62,7 +70,7 @@ func startMetricsServer() {
 	}
 }
 
-func consumeKafka(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client) {
+func consumeKafka(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client, chConn clickhouse.Conn) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{"localhost:9092"},
 		Topic:   "fill-events",
@@ -112,5 +120,9 @@ func consumeKafka(ctx context.Context, pool *pgxpool.Pool, rdb *redis.Client) {
 		}
 
 		log.Printf("recorded event %s", eventID)
+
+		if err := analytics.InsertFillEvent(ctx, chConn, fill); err != nil {
+			log.Printf("failed to insert into clickhouse: %v", err)
+		}
 	}
 }
